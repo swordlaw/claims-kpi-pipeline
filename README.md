@@ -38,13 +38,15 @@ ClaimsProject/
 ├── sql/claims_kpi_project.sql     schema, load + clean, data quality checks, KPI views
 ├── scripts/load_staging.py        CSV -> staging tables (all NVARCHAR(50))
 ├── scripts/build_report.py        KPI views -> ClaimsKPI_Report.xlsx (sheets + Summary charts)
+├── scripts/build_excel_report.ps1 .xlsx -> ClaimsKPI_Report.xlsm (live SQL queries + button)
 ├── vba/RefreshReport.bas          Excel macro: refresh all queries, timestamp, export PDF
-├── ClaimsKPI_Report.xlsx          generated report (snapshot)
+├── ClaimsKPI_Report.xlsm          Excel report: live SQL Server queries, VBA refresh + PDF
+├── ClaimsKPI_Report.xlsx          snapshot version (for Google Sheets)
 ├── docs/
 │   ├── data_quality_findings.md   what was found, how many records, how it was handled
 │   ├── excel_report_setup.md      Google Sheets upload, and click-by-click Excel + VBA setup
 │   └── interview_walkthrough.md   plain-language explanation of the pipeline and decisions
-├── screenshots/                   report screenshots
+├── screenshots/                   chart images exported from the Summary sheet
 └── data/                          raw downloads (git-ignored, never committed)
 ```
 
@@ -107,6 +109,12 @@ All KPIs are views in section 4 of `sql/claims_kpi_project.sql`. Time-trend view
 | Average length of stay | 5.69 days |
 | 30-day readmission rate | 10.0% (16.5% in 2008 Q1 → 2.6% in 2010 Q4) |
 
+![Monthly paid amount](screenshots/monthly_paid_trend.png)
+
+![PMPM by year](screenshots/pmpm_by_year.png)
+
+![30-day readmission rate by quarter](screenshots/readmission_rate_by_quarter.png)
+
 **Interpretation caveat:** the drop in 2010 is a property of the synthetic file, not a real trend. Inpatient admissions per 1,000 member-years fall from 256 to 129 while membership falls only 3%. See [data quality findings](docs/data_quality_findings.md#analytic-caveats-not-errors-but-they-affect-interpretation).
 
 ## Data quality findings (summary)
@@ -150,10 +158,11 @@ py -m pip install pyodbc openpyxl
    sqlcmd -S "np:\\.\pipe\MSSQL$SQLEXPRESS\sql\query" -E -C -b -i sql\claims_kpi_project.sql
    ```
    (The explicit named-pipe address avoids a known issue where the Go-based `sqlcmd` times out resolving `localhost\SQLEXPRESS`. SSMS and ODBC connect with `localhost\SQLEXPRESS` normally.) The script is re-runnable: it drops and recreates everything except the staging tables.
-4. **Build the report.**
+4. **Build the report.** The first command makes the snapshot `.xlsx`. The second turns it into the Excel version with live queries (needs Excel).
    ```powershell
    py scripts/build_report.py
+   powershell -ExecutionPolicy Bypass -File scriptsuild_excel_report.ps1
    ```
-5. **Excel version (live queries + VBA button)** or **Google Sheets upload:** follow [docs/excel_report_setup.md](docs/excel_report_setup.md).
+5. **Import the macro once** (Alt+F11 → File → Import File → `vba\RefreshReport.bas` → save). After that, the **Refresh & Export PDF** button on Summary refreshes everything from SQL Server and saves a dated PDF. Details, and the Google Sheets route: [docs/excel_report_setup.md](docs/excel_report_setup.md).
 
 Total runtime: about 3 minutes (most of it loading 790k outpatient rows).
