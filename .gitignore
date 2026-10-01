@@ -1,0 +1,12 @@
+# Raw CMS downloads and extracted CSVs -- never commit source data
+data/
+
+# Generated PDF exports from RefreshAndExport
+KPI_Summary_*.pdf
+
+# Office lock / temp files
+~$*
+
+# Python
+__pycache__/
+*.pyc
