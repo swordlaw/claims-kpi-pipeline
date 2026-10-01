@@ -142,7 +142,7 @@ def build_summary(ws):
 
     # Charts
     c1 = LineChart()
-    c1.title, c1.y_axis.title, c1.height, c1.width = "Monthly paid amount", "Paid ($)", 8, 18
+    c1.title, c1.height, c1.width = "Monthly paid amount", 8, 18
     c1.y_axis.numFmt = '"$"#,##0'
     c1.add_data(Reference(ws, min_col=3, max_col=5, min_row=t1, max_row=t1_end), titles_from_data=True)
     c1.set_categories(Reference(ws, min_col=2, min_row=t1 + 1, max_row=t1_end))
@@ -150,19 +150,32 @@ def build_summary(ws):
 
     c2 = BarChart()
     c2.type, c2.grouping, c2.overlap = "col", "stacked", 100
-    c2.title, c2.y_axis.title, c2.height, c2.width = "PMPM by year", "PMPM ($)", 8, 18
+    c2.title, c2.height, c2.width = "PMPM by year", 8, 18
     c2.y_axis.numFmt = '"$"#,##0'
     c2.add_data(Reference(ws, min_col=3, max_col=4, min_row=t2, max_row=t2_end), titles_from_data=True)
     c2.set_categories(Reference(ws, min_col=2, min_row=t2 + 1, max_row=t2_end))
     ws.add_chart(c2, "H21")
 
     c3 = LineChart()
-    c3.title, c3.y_axis.title, c3.height, c3.width = "30-day readmission rate by quarter", "Rate", 8, 18
+    c3.title, c3.height, c3.width = "30-day readmission rate by quarter", 8, 18
     c3.y_axis.numFmt = "0%"
     c3.add_data(Reference(ws, min_col=3, min_row=t3, max_row=t3_end), titles_from_data=True)
     c3.set_categories(Reference(ws, min_col=2, min_row=t3 + 1, max_row=t3_end))
     c3.legend = None
     ws.add_chart(c3, "H38")
+
+    # openpyxl defaults hide both axes, smooth the lines and colour each point
+    # differently; Excel renders those literally, so switch them off.
+    for chart in (c1, c2, c3):
+        chart.x_axis.delete = chart.y_axis.delete = False
+        chart.varyColors = False
+        chart.title.overlay = False
+        if chart.legend is not None:
+            chart.legend.position, chart.legend.overlay = "b", False
+    for chart in (c1, c3):
+        for s in chart.series:
+            s.smooth = False
+    c1.x_axis.number_format, c1.x_axis.tickLblSkip = "mmm yy", 3
 
 
 def main():

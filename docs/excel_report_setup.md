@@ -25,64 +25,53 @@ The Summary tables are `SUMIFS` / `AVERAGEIFS` formulas with whole-column refere
 
 ## Option B: Excel with live SQL Server queries and the VBA macro (`.xlsm`)
 
-These steps need desktop Excel for Windows (Microsoft 365 or 2019+), on the same PC as SQL Server.
+This needs desktop Excel for Windows, on the same PC as SQL Server.
 
-### 1. Connect each view sheet to SQL Server
+### 1. Build the workbook (automated)
 
-Open `ClaimsKPI_Report.xlsx`, then repeat these steps for **each of the 6 `v_...` sheets**:
+```powershell
+py -3.9 scripts\build_report.py
+powershell -ExecutionPolicy Bypass -File scripts\build_excel_report.ps1
+```
 
-1. Go to the sheet (for example `v_kpi_monthly`). Click the corner square above row 1 to select everything, then press **Delete**. This clears the snapshot so the query has room. Don't delete the sheet itself.
-2. **Data** tab → **Get Data** → **From Database** → **From SQL Server Database**.
-3. **Server:** `localhost\SQLEXPRESS`  **Database:** `ClaimsKPI` → **OK**.
-4. On the credentials screen, pick **Windows** → **Use my current credentials** → **Connect**.
-   If you get an *encryption support* message, click **OK** to connect without encryption. This is a local server with a self-signed certificate.
-5. In the **Navigator**, click the view with the **same name as the sheet** (for example `dbo.v_kpi_monthly`).
-6. Click the small arrow next to **Load** → **Load To...** → choose **Table**, **Existing worksheet**, and type `=$A$1` → **OK**.
-   (You've already selected the right sheet, so `$A$1` is that sheet's A1.)
+`build_excel_report.ps1` drives Excel through its COM automation interface:
 
-Each view keeps the same column order as the snapshot, so the Summary formulas keep working.
+1. Opens `ClaimsKPI_Report.xlsx` and, on each of the 6 `v_...` sheets, replaces the snapshot with an **Excel table backed by a live ODBC query**: `SELECT * FROM dbo.<view>` against `localhost\SQLEXPRESS`, using Windows authentication, so there's no password to store.
+2. Sets **`BackgroundQuery = False`** on every query. Otherwise `RefreshAll` would return immediately while the queries are still running, and the macro would stamp the time and export the PDF using **old** data.
+3. Adds the **Refresh & Export PDF** button on Summary (over `D1:F2`; `B1` is kept free for the macro's timestamp), wired to `RefreshAndExport`.
+4. Saves as **`ClaimsKPI_Report.xlsm`** (macro-enabled).
 
-### 2. Turn off background refresh (so the macro waits for the data)
+To see the queries in Excel: **Data** → **Queries & Connections** → **Connections** tab. Right-click a query → **Properties** to see "Enable background refresh" unticked and, under **Definition**, the SQL.
 
-1. **Data** → **Queries & Connections**. A pane opens on the right.
-2. For **each** of the 6 queries: right-click it → **Properties...** → **untick "Enable background refresh"** → **OK**.
+### 2. Import the macro (manual, once)
 
-**Why:** with background refresh on, `RefreshAll` returns immediately while the queries are still running. The macro would then stamp the time and export the PDF using **old** data.
+The script doesn't import the VBA, because that would mean turning on Excel's *"Trust access to the VBA project object model"* security setting, which is best left off.
 
-### 3. Save as macro-enabled
-
-**File** → **Save As** → **Browse** → *Save as type:* **Excel Macro-Enabled Workbook (\*.xlsm)** → name it `ClaimsKPI_Report.xlsm` → **Save**.
-
-### 4. Import the macro
-
-1. If you don't see a **Developer** tab: **File** → **Options** → **Customize Ribbon** → tick **Developer** → **OK**.
+1. Open `ClaimsKPI_Report.xlsm`.
 2. Press **Alt+F11** to open the VBA editor.
-3. **File** → **Import File...** → choose `vba\RefreshReport.bas` → **Open**. A module named `RefreshReport` appears under *Modules*.
-4. Close the VBA editor.
+3. **File** → **Import File...** → choose `vba\RefreshReport.bas` → **Open**. A module `RefreshReport` appears under *Modules*.
+4. Close the VBA editor and press **Ctrl+S**.
 
-### 5. Add the button on Summary
+### 3. Test it
 
-1. Go to the **Summary** sheet.
-2. **Developer** → **Insert** → under *Form Controls*, click **Button** (the first icon).
-3. Drag to draw the button around cells **D1:F2**. Leave **B1** clear, because the macro writes "Last refreshed: ..." there.
-4. In the *Assign Macro* box, choose **RefreshAndExport** → **OK**.
-5. Right-click the button → **Edit Text** → type `Refresh & Export PDF` → click any cell.
-6. Press **Ctrl+S**.
+1. On **Summary**, click **Refresh & Export PDF**.
+2. Excel re-runs all 6 queries. The 66,705-row `v_inpatient_stays` takes a few seconds.
+3. You should see *"Report refreshed and saved to: ...\KPI_Summary_YYYY-MM-DD.pdf"*, and **B1** should show the current time.
+4. Open the PDF to check it's the Summary sheet.
 
-### 6. Test it
+**If macros are blocked:** click **Enable Content** on the yellow bar. If there's a red *"Microsoft has blocked macros"* bar instead, close Excel, right-click the `.xlsm` → **Properties** → tick **Unblock** → **OK**, then reopen it.
 
-1. Click the button. Excel refreshes all 6 queries. The large `v_inpatient_stays` takes a few seconds.
-2. You should see a message *"Report refreshed and saved to: ...\KPI_Summary_YYYY-MM-DD.pdf"*, and **B1** should show the current time.
-3. Open the PDF to check it shows the Summary sheet.
-4. Take screenshots of the Summary sheet and the PDF and save them to `screenshots/`.
-
-**If macros are blocked:** click **Enable Content** on the yellow bar when opening the file. If there's a red *"Microsoft has blocked macros"* bar instead, close Excel, right-click the `.xlsm` → **Properties** → tick **Unblock** → **OK**, then reopen it.
+**If the refresh fails with a connection error:** check the SQL Server service is running (`Get-Service 'MSSQL$SQLEXPRESS'`) and that ODBC Driver 18 for SQL Server is installed.
 
 ### What the macro does (for the interview)
 
 `RefreshAndExport` in `vba/RefreshReport.bas`:
 1. `ThisWorkbook.RefreshAll` re-runs every SQL query.
-2. `Application.CalculateUntilAsyncQueriesDone` waits for any queries that are still running and for the formulas to recalculate.
+2. `Application.CalculateUntilAsyncQueriesDone` waits for any queries still running and for the formulas to recalculate.
 3. Writes a "Last refreshed" timestamp to `Summary!B1`.
 4. Exports the Summary sheet as a dated PDF next to the workbook. This is the file you'd email to stakeholders.
 5. An error handler restores screen updating and shows a readable message instead of a VBA debug dialog.
+
+### Doing it by hand instead (no script)
+
+For each `v_...` sheet: clear the sheet → **Data** → **Get Data** → **From Database** → **From SQL Server Database** → server `localhost\SQLEXPRESS`, database `ClaimsKPI` → **Windows** / *Use my current credentials* → pick the view with the same name → **Load To...** → **Table**, existing worksheet `=$A$1`. Then, in **Queries & Connections**, untick **Enable background refresh** under each query's **Properties**. Save as `.xlsm`, import the macro (step 2), and add a button with **Developer** → **Insert** → **Button (Form Control)** → assign `RefreshAndExport`.
