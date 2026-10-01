@@ -7,6 +7,10 @@ whole-column references, the same Summary works when the view sheets are
 replaced by live Excel queries (see docs/excel_report_setup.md), and it
 recalculates when the file is imported into Google Sheets.
 
+Summary layout: rows 1-46 are a landscape dashboard (headline KPIs, a data
+note and three charts) set to print on one page; the chart tables sit below
+it, outside the print area.
+
 Usage:  py -3.9 scripts/build_report.py
 Needs:  pip install pyodbc openpyxl
 """
@@ -17,7 +21,9 @@ import pathlib
 import pyodbc
 from openpyxl import Workbook
 from openpyxl.chart import BarChart, LineChart, Reference
-from openpyxl.styles import Font, PatternFill
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.worksheet.page import PageMargins
+from openpyxl.worksheet.properties import PageSetupProperties
 from openpyxl.utils import get_column_letter
 
 OUT = pathlib.Path(__file__).resolve().parent.parent / "ClaimsKPI_Report.xlsx"
@@ -77,6 +83,7 @@ def build_summary(ws):
     ws["B1"].font = Font(italic=True, color="666666")
     ws["B2"] = "Claims KPI Summary: CMS DE-SynPUF Sample 1, 2008-2010"
     ws["B2"].font = Font(bold=True, size=14)
+    ws.row_dimensions[2].height = 24
 
     # Headline KPIs (2008-2010)
     ws["B4"] = "Headline KPIs (2008-2010)"
@@ -92,8 +99,17 @@ def build_summary(ws):
         ws.cell(row=i, column=2, value=label)
         ws.cell(row=i, column=3, value=formula).number_format = fmt
 
-    # Table 1: monthly paid (rows 12-48)
-    t1 = 12
+    ws["B11"] = ("Source: CMS DE-SynPUF Sample 1, synthetic Medicare claims (no real "
+                 "patients). Inpatient activity in the synthetic file falls sharply in "
+                 "2010, so the 2010 drop in spend and readmissions reflects how the data "
+                 "was generated, not a real trend.")
+    ws["B11"].font = Font(italic=True, size=9, color="666666")
+    ws["B11"].alignment = Alignment(wrap_text=True, vertical="top")
+    ws.merge_cells("B11:C18")
+
+    # Chart tables start below the printed dashboard (rows 1-46)
+    # Table 1: monthly paid
+    t1 = 51
     ws.cell(row=t1 - 1, column=2, value="Monthly paid amount").font = Font(bold=True)
     for j, h in enumerate(["Month", "Inpatient", "Outpatient", "Total"], start=2):
         ws.cell(row=t1, column=j, value=h)
@@ -142,27 +158,27 @@ def build_summary(ws):
 
     # Charts
     c1 = LineChart()
-    c1.title, c1.height, c1.width = "Monthly paid amount", 8, 18
+    c1.title, c1.height, c1.width = "Monthly paid amount", 11, 26.5
     c1.y_axis.numFmt = '"$"#,##0'
     c1.add_data(Reference(ws, min_col=3, max_col=5, min_row=t1, max_row=t1_end), titles_from_data=True)
     c1.set_categories(Reference(ws, min_col=2, min_row=t1 + 1, max_row=t1_end))
-    ws.add_chart(c1, "H4")
+    ws.add_chart(c1, "D3")
 
     c2 = BarChart()
     c2.type, c2.grouping, c2.overlap = "col", "stacked", 100
-    c2.title, c2.height, c2.width = "PMPM by year", 8, 18
+    c2.title, c2.height, c2.width = "PMPM by year", 11, 13
     c2.y_axis.numFmt = '"$"#,##0'
     c2.add_data(Reference(ws, min_col=3, max_col=4, min_row=t2, max_row=t2_end), titles_from_data=True)
     c2.set_categories(Reference(ws, min_col=2, min_row=t2 + 1, max_row=t2_end))
-    ws.add_chart(c2, "H21")
+    ws.add_chart(c2, "B25")
 
     c3 = LineChart()
-    c3.title, c3.height, c3.width = "30-day readmission rate by quarter", 8, 18
+    c3.title, c3.height, c3.width = "30-day readmission rate by quarter", 11, 21.3
     c3.y_axis.numFmt = "0%"
     c3.add_data(Reference(ws, min_col=3, min_row=t3, max_row=t3_end), titles_from_data=True)
     c3.set_categories(Reference(ws, min_col=2, min_row=t3 + 1, max_row=t3_end))
     c3.legend = None
-    ws.add_chart(c3, "H38")
+    ws.add_chart(c3, "F25")
 
     # openpyxl defaults hide both axes, smooth the lines and colour each point
     # differently; Excel renders those literally, so switch them off.
@@ -176,6 +192,14 @@ def build_summary(ws):
         for s in chart.series:
             s.smooth = False
     c1.x_axis.number_format, c1.x_axis.tickLblSkip = "mmm yy", 3
+
+    # Print the dashboard (not the chart tables) on one landscape page
+    ws.print_area = "B1:Q46"
+    ws.page_setup.orientation = "landscape"
+    ws.page_setup.fitToWidth = ws.page_setup.fitToHeight = 1
+    ws.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
+    ws.print_options.horizontalCentered = True
+    ws.page_margins = PageMargins(left=0.4, right=0.4, top=0.4, bottom=0.4, header=0.2, footer=0.2)
 
 
 def main():

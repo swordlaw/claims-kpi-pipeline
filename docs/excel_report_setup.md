@@ -38,7 +38,7 @@ powershell -ExecutionPolicy Bypass -File scripts\build_excel_report.ps1
 
 1. Opens `ClaimsKPI_Report.xlsx` and, on each of the 6 `v_...` sheets, replaces the snapshot with an **Excel table backed by a live ODBC query**: `SELECT * FROM dbo.<view>` against `localhost\SQLEXPRESS`, using Windows authentication, so there's no password to store.
 2. Sets **`BackgroundQuery = False`** on every query. Otherwise `RefreshAll` would return immediately while the queries are still running, and the macro would stamp the time and export the PDF using **old** data.
-3. Adds the **Refresh & Export PDF** button on Summary (over `D1:F2`; `B1` is kept free for the macro's timestamp), wired to `RefreshAndExport`.
+3. Adds the **Refresh & Export PDF** button at the top right of Summary (over `O1:Q2`, clear of the title and of `B1`, where the macro writes its timestamp), wired to `RefreshAndExport`. The button is set not to print.
 4. Saves as **`ClaimsKPI_Report.xlsm`** (macro-enabled).
 
 To see the queries in Excel: **Data** → **Queries & Connections** → **Connections** tab. Right-click a query → **Properties** to see "Enable background refresh" unticked and, under **Definition**, the SQL.
@@ -69,7 +69,7 @@ The script doesn't import the VBA, because that would mean turning on Excel's *"
 1. `ThisWorkbook.RefreshAll` re-runs every SQL query.
 2. `Application.CalculateUntilAsyncQueriesDone` waits for any queries still running and for the formulas to recalculate.
 3. Writes a "Last refreshed" timestamp to `Summary!B1`.
-4. Exports the Summary sheet as a dated PDF next to the workbook. This is the file you'd email to stakeholders.
+4. Exports the Summary sheet as a dated PDF next to the workbook: **one landscape page** with the headline KPIs, the data note and the three charts. The chart tables further down the sheet are outside the print area. This is the file you'd email to stakeholders.
 5. An error handler restores screen updating and shows a readable message instead of a VBA debug dialog.
 
 ### Doing it by hand instead (no script)

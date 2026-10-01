@@ -63,13 +63,14 @@ try {
         Write-Output ("{0,-28} {1,7:N0} rows (live query, background refresh off)" -f $name, $lo.ListRows.Count)
     }
 
-    # Button on Summary, over D1:F2 (B1 is where the macro writes "Last refreshed")
+    # Button on Summary, top right over O1:Q2, clear of the title and of B1 (where the macro writes "Last refreshed")
     $sum = $wb.Worksheets.Item('Summary')
-    $r = $sum.Range('D1:F2')
+    $r = $sum.Range('O1:Q2')
     $btn = $sum.Buttons().Add($r.Left, $r.Top, $r.Width, $r.Height)
     $btn.Name = 'btnRefreshAndExport'
     $btn.OnAction = 'RefreshAndExport'
     $btn.Characters().Text = 'Refresh & Export PDF'
+    $btn.PrintObject = $false            # keep the button out of the PDF
     $sum.Range('B1').Value2 = "Last refreshed: $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
     $xl.CalculateFull()
     $sum.Activate()
