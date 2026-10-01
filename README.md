@@ -4,6 +4,10 @@ An end-to-end healthcare claims reporting pipeline: raw CMS Medicare claims file
 
 **Stack:** SQL Server 2025 Express · T-SQL · Python (pyodbc, openpyxl) for loading · Excel / Google Sheets · VBA
 
+![Claims KPI Summary dashboard](screenshots/summary_dashboard.png)
+
+*The Summary sheet as it prints. The **Refresh & Export PDF** button re-queries SQL Server and saves this page as a dated one-page PDF.*
+
 ## Purpose
 
 This project shows the day-to-day work of an IT / data analyst on a benefits or claims team:
@@ -46,7 +50,7 @@ ClaimsProject/
 │   ├── data_quality_findings.md   what was found, how many records, how it was handled
 │   ├── excel_report_setup.md      Google Sheets upload, and click-by-click Excel + VBA setup
 │   └── interview_walkthrough.md   plain-language explanation of the pipeline and decisions
-├── screenshots/                   chart images exported from the Summary sheet
+├── screenshots/                   Summary dashboard and chart images exported from Excel
 └── data/                          raw downloads (git-ignored, never committed)
 ```
 
